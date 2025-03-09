@@ -1,18 +1,62 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { CreateOrderDto } from './dto/create-order.dto';
+import { PrismaService } from 'src/prisma/prisma.service';
+import { NATS_SERVICE } from 'src/config/services';
+import { ClientProxy, RpcException } from '@nestjs/microservices';
+import { firstValueFrom } from 'rxjs';
 
 @Injectable()
 export class OrdersService {
-  create(createOrderDto: CreateOrderDto) {
-    return 'This action adds a new order';
+
+  constructor(
+    private readonly prisma: PrismaService,
+  ) { }
+
+  async create(createOrderDto: CreateOrderDto) {
+    //TODO verificar existencia del usuario
+    //TODO verificar que el producto exista
+    //TODO verificar el stockc del producto
+
+    //creaccion de la orden
+    const order = await this.prisma.order.create({
+      data: createOrderDto,
+      include: {
+        orderDetails: {
+          select: {
+            productId: true
+          }
+        }
+      }
+    })
+
+    return {
+      order,
+      message: "Orden creada exitosamente"
+    }
   }
 
-  findAll() {
-    return `This action returns all orders`;
+  async findAll() {
+    const orders = await this.prisma.order.findMany({
+      include: {
+        _count: {
+          select: {
+            orderDetails: true
+          }
+        },
+        orderDetails: true
+      },
+      orderBy: {
+        createdAt: "desc"
+      }
+    })
+    return {
+      orders
+    }
+
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} order`;
+  async findOne(id: number) {
+    
   }
 
 }
