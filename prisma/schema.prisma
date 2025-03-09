@@ -18,8 +18,8 @@ model Order {
 
   userId String
 
-  clientName      String
-  clienteLastName String
+  clientName     String
+  clientLastName String
 
   orderDetails OrderDetails[]
 
@@ -36,7 +36,7 @@ model OrderDetails {
 
   productId        String
   productName      String
-  productPriceSale String
+  productPriceSale Decimal
 
   subTotal Decimal
   quantity Int

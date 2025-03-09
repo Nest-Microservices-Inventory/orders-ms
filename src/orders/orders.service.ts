@@ -10,39 +10,73 @@ export class OrdersService {
 
   constructor(
     private readonly prisma: PrismaService,
+    @Inject(NATS_SERVICE) private readonly client: ClientProxy
   ) { }
 
   async create(createOrderDto: CreateOrderDto) {
-    //TODO verificar existencia del usuario
-    //TODO verificar que el producto exista
-    //TODO verificar el stockc del producto
 
-    //creaccion de la orden
-    const order = await this.prisma.order.create({
-      data: createOrderDto,
-      include: {
-        orderDetails: {
-          select: {
-            productId: true
+    const { orderDetails, ...orderData } = createOrderDto
+    try {
+      //--------- TODO: verificar existencia del usuario
+
+
+      // TODO: verificar que el producto exista
+      const productIds = orderDetails.map(item => item.productId);
+      await firstValueFrom(this.client.send('validateProductsIds', productIds))
+
+
+      // TODO: verificar el stockc del producto
+      const productsQuantity = orderDetails.map(item => {
+        return { id: item.productId, quantity: item.quantity }
+      })
+
+      const updateProductsStock = await firstValueFrom(
+        this.client.send('updateProductStock', productsQuantity)
+      )
+
+      if (!updateProductsStock) {
+        throw new RpcException({
+          message: "Stock insuficiente",
+          statusCode: 400
+        })
+      }
+
+
+      //creaccion de la orden
+      const order = await this.prisma.order.create({
+        data: {
+          ...orderData,
+          orderDetails: {
+            create: orderDetails
+          }
+        },
+        include: {
+          orderDetails: {
+            select: {
+              productId: true,
+              productName: true,
+              quantity: true,
+              subTotal: true
+            }
           }
         }
-      }
-    })
+      })
 
-    return {
-      order,
-      message: "Orden creada exitosamente"
+      return {
+        order,
+        message: "Orden creada exitosamente"
+      }
+    } catch (error) {
+      throw new RpcException({
+        message: error.message,
+        statusCode: error.statusCode
+      })
     }
   }
 
   async findAll() {
     const orders = await this.prisma.order.findMany({
       include: {
-        _count: {
-          select: {
-            orderDetails: true
-          }
-        },
         orderDetails: true
       },
       orderBy: {
@@ -56,7 +90,7 @@ export class OrdersService {
   }
 
   async findOne(id: number) {
-    
+
   }
 
 }
